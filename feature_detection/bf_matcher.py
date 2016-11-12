@@ -11,9 +11,9 @@ img2Gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 surf = cv2.xfeatures2d.SURF_create()
 
 # find the keypoints and descriptors with SURF
-(kp1, des1) = surf.detectAndCompute(img1,None)
+(kp1, des1) = surf.detectAndCompute(img1Gray,None)
 print("# kp1: {}, descriptors1: {}".format(len(kp1), des1.shape))
-(kp2, des2) = surf.detectAndCompute(img2,None)
+(kp2, des2) = surf.detectAndCompute(img2Gray,None)
 print("# kp2: {}, descriptors2: {}".format(len(kp2), des2.shape))
 # BFMatcher with default params
 bf = cv2.BFMatcher()
