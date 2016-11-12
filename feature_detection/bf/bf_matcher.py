@@ -2,9 +2,9 @@ import numpy as np
 import cv2
 from matplotlib import pyplot as plt
 
-img1 = cv2.imread('img/2093GSW.jpg') # queryImage
+img1 = cv2.imread('../img/2093GSW.jpg') # queryImage
 img1Gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-img2 = cv2.imread('img/matricula-zoom.jpg') # trainImage
+img2 = cv2.imread('../img/matricula-zoom.jpg') # trainImage
 img2Gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
 # Initiate SURF detector
