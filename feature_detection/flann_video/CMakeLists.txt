@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+project( flann_video_matcher )
+find_package( OpenCV REQUIRED )
+add_executable( flann_video_matcher flann_video_matcher.cpp )
+target_link_libraries( flann_video_matcher ${OpenCV_LIBS} )

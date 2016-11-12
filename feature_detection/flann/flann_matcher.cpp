@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <iostream>
-#include <stdio.h>
 #include <iostream>
 #include "opencv2/core.hpp"
 #include "opencv2/features2d.hpp"
