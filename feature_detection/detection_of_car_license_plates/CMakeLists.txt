@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+project( car_license_plates )
+find_package( OpenCV REQUIRED )
+add_executable( car_license_plates car_license_plates.cpp )
+target_link_libraries( car_license_plates ${OpenCV_LIBS} )
