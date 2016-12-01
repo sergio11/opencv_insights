@@ -9,10 +9,13 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/xfeatures2d.hpp"
 #include <opencv2/imgproc/imgproc.hpp>
+#include <tesseract/baseapi.h>
+#include <leptonica/allheaders.h>
 
 using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
+using namespace tesseract;
 
 const int WIDTH_SIZE = 640;
 const int HEIGHT_SIZE = 480;
@@ -32,6 +35,22 @@ Mat loadImage(string path)
     }
 
     return queryImg;
+}
+
+Mat boundingPattern(Mat imgPattern, Mat imgScene, Mat h)
+{
+    std::cout<< " --(!) Recortando imagen " << std::endl;
+    std::vector<Point2f> obj_corners(4);
+    obj_corners[0] = cvPoint(0,0); 
+    obj_corners[1] = cvPoint( imgPattern.cols, 0 );
+    obj_corners[2] = cvPoint( imgPattern.cols, imgPattern.rows ); 
+    obj_corners[3] = cvPoint( 0, imgPattern.rows );
+    std::vector<Point2f> scene_corners(4);
+    perspectiveTransform( obj_corners, scene_corners, h);
+    // Get crop image
+    Rect box = boundingRect(Mat(scene_corners));
+    Mat roi = Mat(imgScene,box);
+    return roi;
 }
 
 /*
@@ -67,7 +86,7 @@ std::vector<Point2f> removeOutsidePoints(std::vector<Point2f> scene, double min_
 }
 
 // Función encargada de detectar los puntos característicos de la imagen.
-std::vector<Point2f> getKeyPoints(Mat imgPattern, Mat imgScene){
+Mat getHomography(Mat imgPattern, Mat imgScene){
     // Se pretende determinar todas las coincidencias entre la imagen de entrada  y el patrón
     Ptr<SURF> detector = SURF::create();
     detector->setHessianThreshold(MIN_HESSIAN);
@@ -115,6 +134,8 @@ std::vector<Point2f> getKeyPoints(Mat imgPattern, Mat imgScene){
                good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
                vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
     
+    imshow("Good Matches & Object detection", img_matches);
+
     std::vector<Point2f> obj;
     std::vector<Point2f> scene;
     std::cout<< " --(!) Obteniendo puntos clave de las coincidencias buenas " << std::endl; 
@@ -131,31 +152,7 @@ std::vector<Point2f> getKeyPoints(Mat imgPattern, Mat imgScene){
     printf("-- scene size : %lu \n", scene.size() );
     std::cout<< " --(!) Obteniendo homografía" << std::endl; 
     Mat h = findHomography( obj, scene, CV_RANSAC );
-    if (!h.empty())
-    {
-        std::cout<< " --(!) Deformando Imagen " << std::endl;
-        std::vector<Point2f> obj_corners(4);
-        obj_corners[0] = cvPoint(0,0); 
-        obj_corners[1] = cvPoint( imgPattern.cols, 0 );
-        obj_corners[2] = cvPoint( imgPattern.cols, imgPattern.rows ); 
-        obj_corners[3] = cvPoint( 0, imgPattern.rows );
-        std::vector<Point2f> scene_corners(4);
-        perspectiveTransform( obj_corners, scene_corners, h);
-        line( img_matches, scene_corners[0] + Point2f( imgPattern.cols, 0), scene_corners[1] + Point2f( imgPattern.cols, 0), Scalar(0, 255, 0), 4 );
-        line( img_matches, scene_corners[1] + Point2f( imgPattern.cols, 0), scene_corners[2] + Point2f( imgPattern.cols, 0), Scalar( 0, 255, 0), 4 );
-        line( img_matches, scene_corners[2] + Point2f( imgPattern.cols, 0), scene_corners[3] + Point2f( imgPattern.cols, 0), Scalar( 0, 255, 0), 4 );
-        line( img_matches, scene_corners[3] + Point2f( imgPattern.cols, 0), scene_corners[0] + Point2f( imgPattern.cols, 0), Scalar( 0, 255, 0), 4 );
-        // Output image
-        Mat im_out;
-        // Warp source image to destination based on homography
-        warpPerspective(imgPattern, im_out, h, imgScene.size());
-        imshow("Wrap Perspective", im_out);
-    }
-
-    imshow("Good Matches & Object detection", img_matches);
-    
-    waitKey(0);
-    return obj;
+    return h;
 }
 
 int main(int argc, char** argv)
@@ -178,7 +175,13 @@ int main(int argc, char** argv)
     }
     // Redimensiona imagen de entrada para trabajar siempre con las mismas dimensiones
     resize(img, img, Size(WIDTH_SIZE, HEIGHT_SIZE));
-    std::vector<Point2f> points = getKeyPoints(pattern, img);
+    Mat h = getHomography(pattern, img);
+    if(!h.empty())
+    {
+        Mat cropImage = boundingPattern(pattern, img, h);
+        imshow("Crop Image", cropImage);
+    }
+        
     std::cout<< " --(!) Operación finalizada " << std::endl;
     waitKey(0);
 }
