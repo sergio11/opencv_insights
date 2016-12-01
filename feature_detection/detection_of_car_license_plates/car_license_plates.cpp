@@ -67,30 +67,31 @@ std::vector<Point2f> removeOutsidePoints(std::vector<Point2f> scene, double min_
 }
 
 // Función encargada de detectar los puntos característicos de la imagen.
-std::vector<Point2f> getKeyPoints(Mat ImgScene, Mat ImgPattern){
+std::vector<Point2f> getKeyPoints(Mat imgPattern, Mat imgScene){
     // Se pretende determinar todas las coincidencias entre la imagen de entrada  y el patrón
     Ptr<SURF> detector = SURF::create();
     detector->setHessianThreshold(MIN_HESSIAN);
     FlannBasedMatcher matcher;
-    std::vector<KeyPoint> keypointsScene, keypointsPattern;
-    Mat descriptorsScene, descriptorsPattern;
+    std::vector<KeyPoint> keypointsPattern, keypointsScene;
+    Mat descriptorsPattern, descriptorsScene;
     std::vector<DMatch> matches;
     std::vector<DMatch> good_matches;
     // variables para discriminar puntos característicos en las imagenes
     double max_dist = 0, min_dist = 100, dist;
     std::cout<< " --(!) Buscando puntos característicos " << std::endl; 
+    std::cout<< " --(!) Enlazamos coincidencias " << std::endl; 
     // Buscamos puntos característicos un número determinado de veces para descartar los malos
     do{
         /*
             1 -> Detecta puntos característicos de las imágenes
             2 -> Calcula los descriptores (Puntos característicos que más información contienen).
         */
-        detector->detectAndCompute(ImgScene, Mat(), keypointsScene, descriptorsScene);
-        detector->detectAndCompute(ImgPattern, Mat(), keypointsPattern, descriptorsPattern);
+        detector->detectAndCompute(imgPattern, Mat(), keypointsPattern, descriptorsPattern);
+        detector->detectAndCompute(imgScene, Mat(), keypointsScene, descriptorsScene);
         // Enlazamos coincidencias de los descriptores SURF con el FLANN matcher.
-        matcher.match( descriptorsScene, descriptorsPattern, matches);
+        matcher.match( descriptorsPattern, descriptorsScene, matches);
         //calculo de la máxima y mínima distancia entre puntos característicos
-        for( int i = 0; i < descriptorsScene.rows; i++)
+        for( int i = 0; i < descriptorsPattern.rows; i++)
         {
             dist = matches[i].distance;
             if(dist < min_dist) min_dist = dist;
@@ -98,7 +99,7 @@ std::vector<Point2f> getKeyPoints(Mat ImgScene, Mat ImgPattern){
         }
         // Buscamos coincidencias buenas, aquellas cuyo distancia es menor que 1.5 veces
         // la mínima distancia entre puntos característicos.
-        for(int i = 0; i < descriptorsScene.rows; i++)
+        for(int i = 0; i < descriptorsPattern.rows; i++)
         {
             if(matches[i].distance < 1.5*min_dist)
                 good_matches.push_back(matches[i]);
@@ -107,49 +108,55 @@ std::vector<Point2f> getKeyPoints(Mat ImgScene, Mat ImgPattern){
 
     printf("-- Max dist : %f \n", max_dist );
     printf("-- Min dist : %f \n", min_dist );
-    printf("-- Matches: %d \n", matches.size());
-    printf("-- Good Matches: %d \n", good_matches.size());
+    printf("-- Matches: %lu \n", matches.size());
+    printf("-- Good Matches: %lu \n", good_matches.size());
     Mat img_matches;
-    drawMatches(  ImgScene, keypointsScene, ImgPattern, keypointsPattern,
+    drawMatches(imgPattern, keypointsPattern, imgScene, keypointsScene,
                good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
                vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
     
-
     std::vector<Point2f> obj;
     std::vector<Point2f> scene;
     std::cout<< " --(!) Obteniendo puntos clave de las coincidencias buenas " << std::endl; 
     for(int i = 0; i < good_matches.size(); i++)
     {
         //Obtenemos los keypointsScene de las coincidencias buenas
-        obj.push_back( keypointsPattern[ good_matches[i].trainIdx ].pt );
-        scene.push_back( keypointsScene[ good_matches[i].queryIdx ].pt );
+        obj.push_back( keypointsPattern[ good_matches[i].queryIdx ].pt );
+        scene.push_back( keypointsScene[ good_matches[i].trainIdx ].pt );
     }    
     // eliminamos aquellos puntos que se encuentren fuera de la matrícula
     
-    //obj = removeOutsidePoints(scene, 0.20, ImgPattern);
-    printf("-- obj size : %d \n", obj.size() );
-    printf("-- scene size : %d \n", scene.size() );
-    Mat h = findHomography( obj, scene, CV_RANSAC  );
+    scene = removeOutsidePoints(scene, 0.20, imgPattern);
+    printf("-- obj size : %lu \n", obj.size());
+    printf("-- scene size : %lu \n", scene.size() );
+    std::cout<< " --(!) Obteniendo homografía" << std::endl; 
+    Mat h = findHomography( obj, scene, CV_RANSAC );
     if (!h.empty())
     {
-        imshow("findHomography",h);
+        std::cout<< " --(!) Deformando Imagen " << std::endl;
+        std::vector<Point2f> obj_corners(4);
+        obj_corners[0] = cvPoint(0,0); 
+        obj_corners[1] = cvPoint( imgPattern.cols, 0 );
+        obj_corners[2] = cvPoint( imgPattern.cols, imgPattern.rows ); 
+        obj_corners[3] = cvPoint( 0, imgPattern.rows );
+        std::vector<Point2f> scene_corners(4);
+        perspectiveTransform( obj_corners, scene_corners, h);
+        line( img_matches, scene_corners[0] + Point2f( imgPattern.cols, 0), scene_corners[1] + Point2f( imgPattern.cols, 0), Scalar(0, 255, 0), 4 );
+        line( img_matches, scene_corners[1] + Point2f( imgPattern.cols, 0), scene_corners[2] + Point2f( imgPattern.cols, 0), Scalar( 0, 255, 0), 4 );
+        line( img_matches, scene_corners[2] + Point2f( imgPattern.cols, 0), scene_corners[3] + Point2f( imgPattern.cols, 0), Scalar( 0, 255, 0), 4 );
+        line( img_matches, scene_corners[3] + Point2f( imgPattern.cols, 0), scene_corners[0] + Point2f( imgPattern.cols, 0), Scalar( 0, 255, 0), 4 );
+        // Output image
+        Mat im_out;
+        // Warp source image to destination based on homography
+        warpPerspective(imgPattern, im_out, h, imgScene.size());
+        imshow("Wrap Perspective", im_out);
     }
-    imshow("Matches",img_matches);
+
+    imshow("Good Matches & Object detection", img_matches);
     
     waitKey(0);
     return obj;
 }
-
-void CannyThreshold(Mat img, int lowThreshold, int ratio, int kernel_size)
-{
-    string window_name = "Edge Map";
-    Mat detected_edges;
-    // Reducimos el ruido con un núcleo 3X3
-    blur( img, detected_edges, Size(3,3) );
-    // Aplicamos el Algoritmo Canny
-    Canny( detected_edges, detected_edges, lowThreshold, lowThreshold*ratio, kernel_size );
-    imshow( window_name, detected_edges );
- }
 
 int main(int argc, char** argv)
 {
@@ -158,7 +165,8 @@ int main(int argc, char** argv)
     // Carga imagen 
     img = loadImage(argv[1]);
     // Cargamos imagen del patrón
-    pattern = loadImage("../img/2093GSW.jpg");
+    pattern = loadImage("../img/pattern.jpg");
+    //GaussianBlur(pattern, pattern, Size(21, 21), 0);
     if(!img.data || !pattern.data)
     {
         std::cout<< " --(!) Error al cargar las imagenes " << std::endl; 
@@ -170,12 +178,7 @@ int main(int argc, char** argv)
     }
     // Redimensiona imagen de entrada para trabajar siempre con las mismas dimensiones
     resize(img, img, Size(WIDTH_SIZE, HEIGHT_SIZE));
-    std::vector<Point2f> points = getKeyPoints(img, pattern);
-    // Buscamos rectángulo
-    /*Mat imageCrop = findRectangle(points, img);
-    imshow("Image Crop", imageCrop);
-    CannyThreshold(imageCrop, MAX_LOW_THRESHOLD, RATIO, KERNEL_SIZE);*/
-   
+    std::vector<Point2f> points = getKeyPoints(pattern, img);
     std::cout<< " --(!) Operación finalizada " << std::endl;
     waitKey(0);
 }
