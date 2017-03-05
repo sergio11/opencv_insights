@@ -1,4 +1,13 @@
-var scene, camera, renderer, light, earthMesh, earthRotY = 0;
+var scene, camera, renderer, light;
+var earthRotY = 0, moonRotY = 0;
+var radY = 0, radZ = -0.3;
+var moonDist = 70;
+var earthRadius = 25;
+var earthMesh, tmpMesh;
+var moonMesh;
+var positionHistory = [];
+var lastPos, diffMove, lastEarthScale;
+var ping = 0;
 
 function initScene(width, height) {
     scene = new THREE.Scene();
@@ -36,10 +45,38 @@ function initEarth() {
     scene.add(earthMesh);
 }
 
+function initMoon() {
+    var moonTexture = THREE.ImageUtils.loadTexture(moonBase64);
+    moonTexture.minFilter = THREE.NearestFilter;
+    var moonMaterial = new THREE.MeshLambertMaterial({
+        map: moonTexture,
+    });
+    var moonGeometry =  new THREE.SphereGeometry(earthRadius * 0.273, 10, 10);
+    moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
+    moonMesh.receiveShadow = true;
+    moonMesh.castShadow = true;
+    scene.add(moonMesh);
+}
+
 // Update position of objects in the scene
 function update() {
     earthRotY += 0.007;
     earthMesh.rotation.y = earthRotY;
+
+    // Update Moon position
+    moonRotY += 0.005;
+    radY += 0.03;
+    radZ += 0.0005;
+
+    // Calculate position on a sphere
+    x = moonDist * Math.cos(radZ) * Math.sin(radY);
+    y = moonDist * Math.sin(radZ) * Math.sin(radY);
+    z = moonDist * Math.cos(radY);
+
+    // We can keep `z` as is because we're not moving the Earth
+    // along z axis.
+    moonMesh.position.set(x + earthMesh.position.x, y + earthMesh.position.y, z);
+    moonMesh.rotation.y = moonRotY;
 }
 
 // Redraw entire scene
@@ -55,6 +92,7 @@ document.addEventListener('DOMContentLoaded', function(e) {
     // Initialize everything and start rendering
     initScene(window.innerWidth, window.innerHeight);
     initEarth();
+    initMoon();
     initLight();
     // Start rendering the scene
     requestAnimationFrame(render);
