@@ -27,3 +27,12 @@ Contributions to this repository are welcome. If you have additional examples, i
 ## License 📝
 
 The code in this repository is provided under the [MIT License](LICENSE). You are free to use, modify, and distribute the code for both commercial and non-commercial purposes. See the [LICENSE](LICENSE) file for more details.
+
+ ## Visitors Count
+
+<img width="auto" src="https://profile-counter.glitch.me/opencv_insights/count.svg" />
+ 
+ ## Please Share & Star the repository to keep me motivated.
+  <a href = "https://github.com/sergio11/opencv_insights/stargazers">
+     <img src = "https://img.shields.io/github/stars/sergio11/opencv_insights" />
+  </a>
